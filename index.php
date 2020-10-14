@@ -1,88 +1,42 @@
 <?php
-define( 'DB_HOST', 'localhost');
-define( 'DB_USER', 'root');
-define( 'DB_PASS', '');
-define( 'DB_NAME', 'board');
-
+require 'database.php';
+require 'keijiban.php';
 
 // タイムゾーン設定
 date_default_timezone_set('Asia/Tokyo');
 
-// 変数の初期化
-$now_date = null;
-$data = null;
-$file_handle = null;
-$split_data = null;
-$success_message = null;
-$message = array();
-$message_array = array();
-$error_message = array();
-$clean = array();
-if( !empty($_POST['btn_submit']) ) {
+$user=new Usertext();
+if (filter_input(INPUT_SERVER, 'REQUEST_METHOD') === 'POST') {
     // 表示名の入力チェック
-    
-    if( empty($_POST['view_name']) ) {
-		$error_message[] = '表示名を入力してください。';
-	} else {
-        $clean['view_name'] = htmlspecialchars( $_POST['view_name'], ENT_QUOTES);
-        $clean['view_name'] = preg_replace( '/\\r\\n|\\n|\\r/', '', $clean['view_name']);
-	}
+    $err=$user->Validation();
+    $keijiban=$user->getUserInfo();
 
-    if( empty($_POST['message']) ) {
-		$error_message[] = 'ひと言メッセージを入力してください。';
-	} else {
-        $clean['message'] = htmlspecialchars( $_POST['message'], ENT_QUOTES);
-        $clean['message'] = preg_replace( '/\\r\\n|\\n|\\r/', '<br>', $clean['message']);
-	}
-
-    if (empty($error_message)) {
+    if (empty($err)) {
        
         // データベースに接続
-        $mysqli = new mysqli( DB_HOST, DB_USER, DB_PASS, DB_NAME);
-        if( $mysqli->connect_errno ) {
-			$error_message[] = '書き込みに失敗しました。 エラー番号 '.$mysqli->connect_errno.' : '.$mysqli->connect_error;
-		} else {
-            // あとでここにデータベースの処理を記述する
-            // 文字コード設定
-			$mysqli->set_charset('utf8');
-			
-			// 書き込み日時を取得
-			$now_date = date("Y-m-d H:i:s");
-			
-			// データを登録するSQL作成
-			$sql = "INSERT INTO message (view_name, message, post_date) VALUES ( '$clean[view_name]', '$clean[message]', '$now_date')";
-			
-			// データを登録
-			$res = $mysqli->query($sql);
-		
-			if( $res ) {
-				$success_message = 'メッセージを書き込みました。';
-			} else {
-				$error_message[] = '書き込みに失敗しました。';
-			}
-		
-			// データベースの接続を閉じる
-			$mysqli->close();
-		}
-	}
-}
-$mysqli = new mysqli( DB_HOST, DB_USER, DB_PASS, DB_NAME);
+        $pdo = connect();
 
-// 接続エラーの確認
-if( $mysqli->connect_errno ) {
-	$error_message[] = 'データの読み込みに失敗しました。 エラー番号 '.$mysqli->connect_errno.' : '.$mysqli->connect_error;
-} else {
-    // ここにデータを取得する処理が入る
-    $sql = "SELECT view_name,message,post_date FROM message ORDER BY post_date DESC";
-	$res = $mysqli->query($sql);
-	
-	if( $res ) {
-		$message_array = $res->fetch_all(MYSQLI_ASSOC);
-	}
-	
-	$mysqli->close();
-}
+        $stmt = $pdo->prepare('INSERT INTO `message` (`id`, `view_name`, `message`, `post_date`) VALUES (null, ?, ?, ?)');
+        
+        $now_date = date("Y-m-d H:i:s");
 
+        $params = [0 => $keijiban->view_name, 1 => $keijiban->message, 2 =>$now_date];
+            
+        $success = $stmt->execute($params);
+            
+        if ($success) {
+            echo 'メッセージを書き込みました。';
+        } else {
+            echo '書き込みに失敗しました。';
+        }
+    }
+}
+    
+        // ここにデータを取得する処理が入る
+        $pdo = connect();
+        $sql = "SELECT * FROM message";
+        $stmt = $pdo->query($sql);
+    
 
 ?>
 
@@ -100,9 +54,9 @@ if( $mysqli->connect_errno ) {
     <p class="success_message"><?php echo $success_message; ?></p>
 <?php endif; ?>
 
-<?php if( !empty($error_message) ): ?>
+<?php if( !empty($err) ): ?>
 	<ul class="error_message">
-		<?php foreach( $error_message as $value ): ?>
+		<?php foreach( $err as $value ): ?>
 			<li>・<?php echo $value; ?></li>
 		<?php endforeach; ?>
 	</ul>
@@ -120,8 +74,8 @@ if( $mysqli->connect_errno ) {
 </form>
 <hr>
 <section>
-<?php if( !empty($message_array) ): ?>
-<?php foreach( $message_array as $value ): ?>
+<?php if( !empty($stmt) ): ?>
+<?php foreach( $stmt as $value ): ?>
 	<article>
     <div class="info">
         <h2><?php echo $value['view_name']; ?></h2>
