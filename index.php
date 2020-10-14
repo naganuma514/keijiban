@@ -1,7 +1,9 @@
 <?php
+define( 'DB_HOST', 'localhost');
+define( 'DB_USER', 'root');
+define( 'DB_PASS', '');
+define( 'DB_NAME', 'board');
 
-// メッセージを保存するファイルのパス設定
-define( 'FILENAME', './message.txt');
 
 // タイムゾーン設定
 date_default_timezone_set('Asia/Tokyo');
@@ -11,33 +13,74 @@ $now_date = null;
 $data = null;
 $file_handle = null;
 $split_data = null;
+$success_message = null;
 $message = array();
 $message_array = array();
+$error_message = array();
+$clean = array();
 if( !empty($_POST['btn_submit']) ) {
-	
-	if( $file_handle = fopen( FILENAME, "a") ) {
-        $now_date = date("Y-m-d H:i:s");
-        $data = "'".$_POST['view_name']."','".$_POST['message']."','".$now_date."'\n";
-        fwrite( $file_handle, $data);
+    // 表示名の入力チェック
+    
+    if( empty($_POST['view_name']) ) {
+		$error_message[] = '表示名を入力してください。';
+	} else {
+        $clean['view_name'] = htmlspecialchars( $_POST['view_name'], ENT_QUOTES);
+        $clean['view_name'] = preg_replace( '/\\r\\n|\\n|\\r/', '', $clean['view_name']);
+	}
 
-		// ファイルを閉じる
-		fclose( $file_handle);
-	}	
+    if( empty($_POST['message']) ) {
+		$error_message[] = 'ひと言メッセージを入力してください。';
+	} else {
+        $clean['message'] = htmlspecialchars( $_POST['message'], ENT_QUOTES);
+        $clean['message'] = preg_replace( '/\\r\\n|\\n|\\r/', '<br>', $clean['message']);
+	}
+
+    if (empty($error_message)) {
+       
+        // データベースに接続
+        $mysqli = new mysqli( DB_HOST, DB_USER, DB_PASS, DB_NAME);
+        if( $mysqli->connect_errno ) {
+			$error_message[] = '書き込みに失敗しました。 エラー番号 '.$mysqli->connect_errno.' : '.$mysqli->connect_error;
+		} else {
+            // あとでここにデータベースの処理を記述する
+            // 文字コード設定
+			$mysqli->set_charset('utf8');
+			
+			// 書き込み日時を取得
+			$now_date = date("Y-m-d H:i:s");
+			
+			// データを登録するSQL作成
+			$sql = "INSERT INTO message (view_name, message, post_date) VALUES ( '$clean[view_name]', '$clean[message]', '$now_date')";
+			
+			// データを登録
+			$res = $mysqli->query($sql);
+		
+			if( $res ) {
+				$success_message = 'メッセージを書き込みました。';
+			} else {
+				$error_message[] = '書き込みに失敗しました。';
+			}
+		
+			// データベースの接続を閉じる
+			$mysqli->close();
+		}
+	}
 }
-if( $file_handle = fopen( FILENAME,'r') ) {
-    while( $data = fgets($file_handle) ){
+$mysqli = new mysqli( DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
-        $split_data = preg_split( '/\'/', $data);
-        $message = array(
-            'view_name' => $split_data[1],
-            'message' => $split_data[3],
-            'post_date' => $split_data[5]
-        );
-        array_unshift( $message_array, $message);
-    }
-
-    // ファイルを閉じる
-    fclose( $file_handle);
+// 接続エラーの確認
+if( $mysqli->connect_errno ) {
+	$error_message[] = 'データの読み込みに失敗しました。 エラー番号 '.$mysqli->connect_errno.' : '.$mysqli->connect_error;
+} else {
+    // ここにデータを取得する処理が入る
+    $sql = "SELECT view_name,message,post_date FROM message ORDER BY post_date DESC";
+	$res = $mysqli->query($sql);
+	
+	if( $res ) {
+		$message_array = $res->fetch_all(MYSQLI_ASSOC);
+	}
+	
+	$mysqli->close();
 }
 
 
@@ -53,6 +96,17 @@ if( $file_handle = fopen( FILENAME,'r') ) {
 <body>
 <h1>ひと言掲示板</h1>
 <!-- ここにメッセージの入力フォームを設置 -->
+<?php if( !empty($success_message) ): ?>
+    <p class="success_message"><?php echo $success_message; ?></p>
+<?php endif; ?>
+
+<?php if( !empty($error_message) ): ?>
+	<ul class="error_message">
+		<?php foreach( $error_message as $value ): ?>
+			<li>・<?php echo $value; ?></li>
+		<?php endforeach; ?>
+	</ul>
+<?php endif; ?>
 <form method="post">
 	<div>
 		<label for="view_name">表示名</label>
