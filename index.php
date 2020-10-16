@@ -12,23 +12,10 @@ if (filter_input(INPUT_SERVER, 'REQUEST_METHOD') === 'POST') {
     $keijiban=$user->getUserInfo();
 
     if (empty($err)) {
-       
         // データベースに接続
         $pdo = connect();
 
-        $stmt = $pdo->prepare('INSERT INTO `message` (`id`, `view_name`, `message`, `post_date`) VALUES (null, ?, ?, ?)');
-        
-        $now_date = date("Y-m-d H:i:s");
-
-        $params = [0 => $keijiban->view_name, 1 => $keijiban->message, 2 =>$now_date];
-            
-        $success = $stmt->execute($params);
-            
-        if ($success) {
-            echo 'メッセージを書き込みました。';
-        } else {
-            echo '書き込みに失敗しました。';
-        }
+        insertText($pdo,$keijiban->view_name,$keijiban->message);
     }
 }
     

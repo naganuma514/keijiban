@@ -27,3 +27,17 @@ function connect()
 
     return $pdo;
 }
+
+function insertText($pdo,$a,$b) {
+    $stmt = $pdo->prepare('INSERT INTO `message` (`id`, `view_name`, `message`, `post_date`) VALUES (null, ?, ?, ?)');
+        
+        $now_date = date("Y-m-d H:i:s");
+
+        $params = [0 => $a, 1 => $b, 2 =>$now_date];
+            
+        $success = $stmt->execute($params);
+            
+        if ($success) {
+            echo 'メッセージを書き込みました。';
+        } 
+} 
